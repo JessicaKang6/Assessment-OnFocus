@@ -1,0 +1,360 @@
+﻿@inherits LayoutComponentBase
+@page "/timer"
+<body>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <div class="page">
+        <!--page title-->
+        <h1 class="timerTitle">OnFocus</h1>
+        @if (isTimerRunning)
+        {
+            <!--timer css-->
+            <div class="timer">
+                <p>@currentMode</p>
+                <svg viewBox="0 0 100 100" style="position: relative; top: 0; padding-bottom: 15px; left: 0; width: 300px; height: 300px;">
+                    <circle cx="50" cy="50" r="40" stroke="@timerBackground" stroke-width="8" fill="transparent" />
+                    <circle cx="50" cy="50" r="40" stroke="@timerColor" stroke-width="8" fill="transparent" stroke-dasharray="251.2" stroke-dashoffset="0" transform="rotate(-90 50 50)" style="@rotationStyle" />
+                    <text x="50" y="50" font-size="24px" text-anchor="middle" alignment-baseline="middle" fill="white">@timeRemaining</text>
+                </svg>
+            </div>
+            <button class="button" @onclick="StopTimer">Stop</button>
+            <!--when the user preses the stop button-->
+            if (stopClicked)
+            {
+                <div class="popUp">
+                    <p>Are you sure you want to reset?!</p>
+                    <button class="button" @onclick="ConfirmStopYes">Yes</button>
+                    <button class="button" @onclick="ConfirmStopNo">No</button>
+                </div>
+            }
+
+        }
+        else
+        {
+            <!--set input for work/break-->
+            if (firstTime)
+            {
+                <div class="setTime">
+                    <div id="studyInput">
+                        <p>Work</p>
+                        <input type="number" @bind-value="@newStudy" min="0" max="60" step="1" />
+                    </div>
+                    <div id="breakInput">
+                        <p>Break</p>
+                        <input type="number" @bind-value="@newBreak" min="0" max="60" step="1" />
+                    </div>
+                    <button id="addTime" @onclick="Add">Add</button>
+                    <p class="error" id="cannotAdd">@cannotAdd</p>
+                    <!--if length of the array is larger than zero then start timer-->
+                    @if (studyMinutes.Length > 0) 
+                    {
+                        <div id="lists">
+                            <ol id="studyList">
+                                @foreach (var (studyMinute, index) in studyMinutes.Select((value, i) => (value, i)))
+                                {
+                                    <li>
+                                        <input type="checkbox" @bind="@selectedTimes[index]" />
+                                        @studyMinute
+                                    </li>
+                                }
+                            </ol>
+                            <ol id="breakList">
+                                @foreach (var breakMinute in breakMinutes)
+                                {
+                                    <li>@breakMinute</li>
+                                }
+                            </ol>
+                        </div>
+                        <button id="removeSelected" @onclick="RemoveSelected">Remove Selected</button>
+                    }
+                    else
+                    {
+                        <p id="noTimes">No times set yet!</p>
+                    }
+                    <div id="message"> <!--user message input-->
+                        <input type="text" placeholder="a fun little message for your future self" @bind-value="@message" />
+                        <br />
+                        <button @onclick="StartTimer">Start</button>
+                        <p id="cannotStart" class="error">@cannotStart</p>
+                    </div>
+                </div>
+            }
+            else
+                {
+                    <div id="pastMessage">
+                        <p>@message</p>
+                        <p>- from your past self</p>
+                    </div>
+                    <br />
+                <button @onclick="Reset">Reset</button>
+            }
+        }
+        <div class="helpButtons">
+            <button id="colorTheme" @onclick="colorTheme"><i class="fa fa-bars"></i></button>
+            <button @onclick="question"><i class="fa fa-question-circle"></i></button>
+            <NavLink class="startButton" href="/"><i class="fa fa-home"></i></NavLink>
+        </div>
+        <!--if user presses colour button-->
+        @if (colorThemePressed == true)
+        {
+            <div class="popUp">
+                <input style="margin: 10px; width: 100px; height: 100px;" type="color" @bind="@selectedColor" />
+                <br />
+                <button @onclick="save">Save</button>
+                <button @onclick="close"><i class="fa fa-close"></i></button>
+            </div>
+        }
+        <!--help popup-->
+        @if (questionPressed == true)
+        {
+            <div class="popUp" style="font-size:15px;">
+                <p>How OnFocus works:</p>
+                <br />
+                <p>1. Decide how long you want to study/break</p>
+                <br />
+                <p>2. Press the 'Add' button to save these times</p>
+                <br />
+                <p>3. Save as many sessions as desired</p>
+                <br />
+                <p>4. Add a message for yourself :)</p>
+                <br />
+                <p>5. Start timer!</p>
+                <button @onclick="close"><i class="fa fa-close"></i></button>
+            </div>
+        }
+
+    </div>
+</body>
+<style>
+    .html, body {
+        background-color: @background;
+        color: white;
+        opacity: 90%;
+        min-height: 100%;
+        min-width: 90%;
+    }
+
+    .popUp {
+        opacity: 98%;
+        width: 50%;
+        position: fixed;
+        top: 55%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: @background;
+        border-radius: 8px;
+        border: 3px solid white;
+        padding: 10px;
+    }
+</style>
+
+@code {
+    private bool isTimerRunning = false; //if true, timer runs 
+    private bool firstTime = true; 
+    private int totalSeconds; //second used for timer 
+    private string currentMode = ""; //work or break mode 
+
+    private int seconds;
+    private string timeRemaining; //time left on timer
+    private string rotationStyle = ""; 
+
+    private string message;//user message
+    private bool confirm = false;//confirm whether user wants to stop timer
+    private bool stopClicked = false;//stop button clicked
+
+    private int[] studyMinutes = new int[0];//study time array
+    private int newStudy;//new value added to array
+    private int[] breakMinutes = new int[0];//break time array
+    private int newBreak;//new value to add to array
+    private bool[] selectedTimes = new bool[0];//sessions selected to be removed 
+    private int currentTime = 0;//keeps track of current session number
+
+    private string cannotAdd; //stops invalid times from being added to timer
+    private string cannotStart; //stops timer from running without imput
+
+    private bool mode = true; //true means work timer, false means break timer
+    private string timerColor = "";//timer colour 
+    private string timerBackground = "";//timer background colour
+    private int timerStroke;//increments of timer circle 
+
+    private bool colorThemePressed = false; //colour icon button
+    private bool questionPressed = false; //help icon button 
+
+    private string selectedColor = "#000000"; //default colour of colour picker
+    private string background = "#283044"; //background colour, origionally set to #283044
+
+
+    //add time values into arrays//
+    private void Add()
+    {
+        if (newStudy > 0)
+        {
+            Array.Resize(ref studyMinutes, studyMinutes.Length + 1);
+            studyMinutes[^1] = newStudy;
+            newStudy = 0;
+
+            Array.Resize(ref selectedTimes, selectedTimes.Length + 1);
+            selectedTimes[^1] = false;
+
+            Array.Resize(ref breakMinutes, breakMinutes.Length + 1);
+            breakMinutes[^1] = newBreak;
+            newBreak = 0;
+            cannotAdd = "";
+        }
+        else
+        {
+            cannotAdd = "invalid work time";
+        }
+
+    }
+    //remove values from arrays//
+    private void RemoveSelected()
+    {
+        for (int i = studyMinutes.Length - 1; i >= 0; i--)
+        {
+            if (selectedTimes[i])
+            {
+                RemoveNumber(i);
+            }
+        }
+    }
+
+    private void RemoveNumber(int index)
+    {
+        if (index >= 0 && index < studyMinutes.Length)
+        {
+            Array.Copy(studyMinutes, index + 1, studyMinutes, index, studyMinutes.Length - index - 1);
+            Array.Copy(breakMinutes, index + 1, breakMinutes, index, breakMinutes.Length - index - 1);
+            Array.Copy(selectedTimes, index + 1, selectedTimes, index, selectedTimes.Length - index - 1);
+            Array.Resize(ref studyMinutes, studyMinutes.Length - 1);
+            Array.Resize(ref breakMinutes, breakMinutes.Length - 1);
+            Array.Resize(ref selectedTimes, selectedTimes.Length - 1);
+        }
+    }
+    //running timer//
+    private async Task StartTimer()
+    {
+        if (studyMinutes.Length > 0)
+        {
+            while (studyMinutes.Length > currentTime)
+            {
+                isTimerRunning = true;
+                firstTime = false;
+                for (int i = 0; i < 2; i++)
+                {
+                    if (mode == true)
+                    {
+
+                            totalSeconds = (studyMinutes[currentTime] * 60);
+                            currentMode = "Work";
+                            timerColor = "#CFCFCF";
+                            timerBackground = "#383838";
+                            mode = false;
+                            timerStroke = studyMinutes[currentTime];
+                    }
+                    else
+                    {
+                        currentMode = "Break :)";
+                        totalSeconds = (breakMinutes[currentTime] * 60);
+                        timerColor = "#383838";
+                        timerBackground = "#CFCFCF";
+                        mode = true;
+                        timerStroke = breakMinutes[currentTime];
+
+                    }
+                    while (totalSeconds > 0)
+                    {
+                        var remainingMinutes = totalSeconds / 60;
+                        var remainingSeconds = totalSeconds % 60;
+                        timeRemaining = $"{remainingMinutes:D2}:{remainingSeconds:D2}";
+                        rotationStyle = $"stroke-dashoffset: {(1 - ((double)totalSeconds / ((double)timerStroke * 60 + (double)seconds))) * 251.2}";
+                        await Task.Delay(1000);
+                        totalSeconds--;
+                        StateHasChanged();
+                    }
+                }
+                currentTime++;
+            }
+
+            isTimerRunning = false;
+        }
+        else
+        {
+            cannotStart = "add study times";
+        }
+    }
+    //stop button pressed and popup//
+    private void StopTimer()
+    {
+        stopClicked = true;
+    }
+    //stop timer after user confirms to stop//
+    private void ConfirmStopYes()
+    {
+        isTimerRunning = false;
+    }
+    //hides popup//
+    private void ConfirmStopNo()
+    {
+        stopClicked = false;
+    }
+    //reset all variables//
+    private void Reset()
+    {
+        isTimerRunning = false;
+        firstTime = true;
+        totalSeconds = 0;
+        currentMode = "";
+
+        seconds = 0;
+        timeRemaining = "";
+        rotationStyle = "";
+
+        message = "";
+        confirm = false;
+        stopClicked = false;
+
+        studyMinutes = new int[0];
+        newStudy = 0;
+        breakMinutes = new int[0];
+        newBreak = 0;
+        selectedTimes = new bool[0];
+        currentTime = 0;
+
+        cannotAdd = "";
+        cannotStart = "";
+
+        mode = true;
+        timerColor = "";
+        timerBackground = "";
+        timerStroke = 0;
+
+        colorThemePressed = false;
+        questionPressed = false;
+    }
+    private void close()
+    {
+        colorThemePressed = false;
+        questionPressed = false;
+    }
+
+    private void colorTheme()
+    {
+        colorThemePressed = true;
+    }
+
+    private void OnColorSelectionChanged(ChangeEventArgs e)
+    {
+        selectedColor = e.Value.ToString();
+    }
+
+    private void question()
+    {
+        questionPressed = true;
+    }
+
+    private void save()
+    {
+        background = selectedColor;
+    }
+}
+

@@ -1,0 +1,41 @@
+﻿@page "/"
+@inject IJSRuntime JSRuntime
+<body>
+    <div class="container">
+        <div class="title">
+            <h1>Welcome to OnFocus</h1>
+            <NavLink class="startButton" href="/timer">Start</NavLink>
+        </div>
+        <div class="ripple" @onclick="HandleClick"></div>
+    </div>
+</body>
+<style>
+    .html, body {
+        background-color: #283044;
+    }
+</style>
+
+@code {
+    private ElementReference containerRef;
+    public class DOMRect
+    {
+        public double Top { get; set; }
+        public double Right { get; set; }
+        public double Bottom { get; set; }
+        public double Left { get; set; }
+        public double Width { get; set; }
+        public double Height { get; set; }
+    }
+
+    private async Task HandleClick(MouseEventArgs e)
+    {
+        // Get the position of the click relative to the container
+        var rect = await JSRuntime.InvokeAsync<DOMRect>("getBoundingClientRect", containerRef);
+        var x = (int)(e.ClientX - rect.Left);
+        var y = (int)(e.ClientY - rect.Top);
+
+        // Update the position and display the ripple effect
+        await JSRuntime.InvokeVoidAsync("showRippleEffect", x, y);
+    }
+}
+
